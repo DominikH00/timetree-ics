@@ -1,0 +1,44 @@
+name: Export TimeTree to ICS (and publish)
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # alle 6 Stunden
+  workflow_dispatch:        # manuell auslösbar
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install exporter
+        run: pip install --upgrade timetree-exporter
+
+      - name: Export ICS
+        env:
+          TIMETREE_EMAIL: ${{ secrets.TIMETREE_EMAIL }}
+          TIMETREE_PASSWORD: ${{ secrets.TIMETREE_PASSWORD }}
+          TIMETREE_CALENDAR_CODE: ${{ secrets.TIMETREE_CALENDAR_CODE }}
+        run: |
+          mkdir -p docs
+          # Exportiere direkt in docs/timetree.ics
+          timetree-exporter -c "$TIMETREE_CALENDAR_CODE" -o docs/timetree.ics
+
+      - name: Commit & push updated ICS
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/timetree.ics
+            git commit -m "Update ICS"
+            git push
+          else
+            echo "No changes to commit."
+          fi
